@@ -49,6 +49,8 @@
 
 (require 's)
 
+(provide 'jg-quicknav)
+
 (defvar jgqn-pwd nil
   "The current working directory, for jg-quicknav. 
 This is kept up-to-date while navigating in the quicknav buffer")
