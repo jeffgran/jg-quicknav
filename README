@@ -1,0 +1,46 @@
+;;; jg-quicknav.el --- Quickly navigate the file system to find a file.
+
+;; Copyright (C) 2013 Jeff Gran
+
+;; Author: Jeff Gran <jeff@jeffgran.com>
+;; Created: 3 Mar 2013
+;; Keywords: navigation
+;; Version: 1.0.0
+;; Package-Requires: ((s))
+
+;; This file is not part of GNU Emacs.
+
+;;; Commentary:
+
+;; Like ido-find-file, lusty-explorer, helm/anything, etc. But none of them
+;; did quite what I wanted so I created this. The goal is to navigate the file 
+;; system as fast as possible. Like a much faster way of doing the...
+;; 
+;;  1. cd <foo>
+;;  2. ls
+;;  3. goto 1
+;;  
+;;  ...loop in the shell.
+;;
+;;
+;; You'll likely want to change some of the key bindings. Just redefine the keys
+;; on jg-quicknav-mode-map. For example, if you use C-n for something else and want
+;; to move up and down lines while navigating with M-n instead, use this:
+;;
+;; (define-key jg-quicknav-mode-map (kbd "C-n") nil)
+;; (define-key jg-quicknav-mode-map (kbd "M-n") 'jgqn-next)
+;; 
+;;
+;; TODO:
+;; - add a command/keybinding to create new file in current directory
+;; - when updating results, clamp the selection index to the number of results
+;;   so it doesn't disappear off the end
+;; - different face/color for executables? or just the "*"?
+;; - hotkey to go directly to dired?
+;; - use save-excursion instead of kill-window?
+;; - make it work remotely? with TRAMP maybe?
+;; - shell-mode plugin to "cd" to a directory chosen via jgqn?
+
+;;; History:
+
+;; 2013-03-03 Initial release v 1.0.0
