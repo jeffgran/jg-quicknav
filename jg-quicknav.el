@@ -5,7 +5,7 @@
 ;; Author: Jeff Gran <jeff@jeffgran.com>
 ;; Created: 3 Mar 2013
 ;; Keywords: navigation
-;; Version: 1.0.0
+;; Version: 1.0.1
 ;; Package-Requires: ((s))
 
 ;; This file is not part of GNU Emacs.
@@ -37,6 +37,7 @@
 ;;   so it doesn't disappear off the end
 ;; - different face/color for executables? or just the "*"?
 ;; - hotkey to go directly to dired?
+;; - secondary-highlight for previous dir after going 'updir'
 ;; - use save-excursion instead of kill-window?
 ;; - make it work remotely? with TRAMP maybe?
 ;; - shell-mode plugin to "cd" to a directory chosen via jgqn?
@@ -44,6 +45,10 @@
 ;;; History:
 
 ;; 2013-03-03 Initial release v 1.0.0
+;; 2013-03-03 v 1.0.1
+;;            - use overriding-local-map in minibuffer to make sure
+;;              the jgqn keys override other minor modes during navigation
+;;            - bugfix: clear out "history" in between sessions
 
 ;;; Code:
 
@@ -90,11 +95,12 @@ to go `jgqn-downdir' (forwards) after going `jgqn-updir' (backwards)")
 (define-key jg-quicknav-mode-map (kbd "M-<") 'jgqn-first)
 (define-key jg-quicknav-mode-map (kbd "M->") 'jgqn-last)
 
-(define-key jg-quicknav-mode-map (kbd "C-e") 'jgqn-show-results)
+;;(define-key jg-quicknav-mode-map (kbd "C-e") 'jgqn-show-results)
 (define-key jg-quicknav-mode-map (kbd "C-g") 'jgqn-minibuffer-exit)
 (define-key jg-quicknav-mode-map (kbd "RET") 'jgqn-visit-file-or-dir)
-(define-key jg-quicknav-mode-map (kbd "C-b") 'jgqn-updir)
-(define-key jg-quicknav-mode-map (kbd "C-f") 'jgqn-downdir)
+(define-key jg-quicknav-mode-map (kbd "C-j") 'jgqn-visit-file-or-dir)
+(define-key jg-quicknav-mode-map (kbd "C-,") 'jgqn-updir)
+(define-key jg-quicknav-mode-map (kbd "C-.") 'jgqn-downdir)
 
 
 (define-minor-mode jg-quicknav-mode
@@ -180,6 +186,7 @@ is the standard `minibuffer-local-map') while navigating:
   (if jgqn-file-or-dir-to-visit
       (switch-to-buffer jgqn-file-or-dir-to-visit))
   (jgqn-cleanup)
+  (setq jgqn-history nil)
   (jgqn-delete-window))
 
 
@@ -240,6 +247,7 @@ Turns out this is my favorite fuzzy matching/sorting algorithm."
   (when (eq this-command 'jg-quicknav)
     (jg-quicknav-mode t)
     ;; t for local-only
+    (setq overriding-local-map jg-quicknav-mode-map)
     (add-hook 'post-command-hook 'jgqn-show-results nil t)))
 
 (defun jgqn-minibuffer-teardown ()
