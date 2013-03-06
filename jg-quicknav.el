@@ -5,7 +5,7 @@
 ;; Author: Jeff Gran <jeff@jeffgran.com>
 ;; Created: 3 Mar 2013
 ;; Keywords: navigation
-;; Version: 1.0.1
+;; Version: 1.1.0
 ;; Package-Requires: ((s))
 
 ;; This file is not part of GNU Emacs.
@@ -32,13 +32,12 @@
 ;; 
 ;;
 ;; TODO:
-;; - add a command/keybinding to create new file in current directory
+;; - use save-excursion or something instead of kill-window (had this mess up my windows once)
 ;; - when updating results, clamp the selection index to the number of results
 ;;   so it doesn't disappear off the end
 ;; - different face/color for executables? or just the "*"?
-;; - hotkey to go directly to dired?
+;;   - and different face for file extensions? (just like dired+)
 ;; - secondary-highlight for previous dir after going 'updir'
-;; - use save-excursion instead of kill-window?
 ;; - make it work remotely? with TRAMP maybe?
 ;; - shell-mode plugin to "cd" to a directory chosen via jgqn?
 
@@ -49,6 +48,13 @@
 ;;            - use overriding-local-map in minibuffer to make sure
 ;;              the jgqn keys override other minor modes during navigation
 ;;            - bugfix: clear out "history" in between sessions
+;; 2013-03-05 v 1.1.0
+;;            - fixed weirdness when going "back" when already at the root directory
+;;            - added `jgqn-find-file' -- key command to open a buffer for a new file
+;;              with the contents of the minibuffer as the filename, in the same directory
+;;              currently being shown
+;;            - added `jgqn-dired' -- key command to drop into dired in the same directory
+;;              currently being shown
 
 ;;; Code:
 
@@ -101,6 +107,8 @@ to go `jgqn-downdir' (forwards) after going `jgqn-updir' (backwards)")
 (define-key jg-quicknav-mode-map (kbd "C-j") 'jgqn-visit-file-or-dir)
 (define-key jg-quicknav-mode-map (kbd "C-,") 'jgqn-updir)
 (define-key jg-quicknav-mode-map (kbd "C-.") 'jgqn-downdir)
+(define-key jg-quicknav-mode-map (kbd "C-o") 'jgqn-find-file)
+(define-key jg-quicknav-mode-map (kbd "C-/") 'jgqn-dired)
 
 
 (define-minor-mode jg-quicknav-mode
@@ -250,6 +258,8 @@ Turns out this is my favorite fuzzy matching/sorting algorithm."
     (setq overriding-local-map jg-quicknav-mode-map)
     (add-hook 'post-command-hook 'jgqn-show-results nil t)))
 
+
+;; I'm not even using this in most places -- it seems to be useless.
 (defun jgqn-minibuffer-teardown ()
   "For assigning to the `minibuffer-exit-hook' to clean up after a `jg-quicknav' session."
   (when (eq this-command 'jgqn-minibuffer-exit)
@@ -321,17 +331,16 @@ is a directory."
 (defun jgqn-updir ()
   "Change directories up a level, like using `cd ..`"
   (interactive)
-  (let* ((tokens (s-split "/" (jgqn-pwd)))
-         (olddir (last tokens))
-         (tokens (butlast tokens))
-         (newdir (s-join "/" tokens)))
-    (push olddir jgqn-history)
-    (jgqn-cleanup)
-    (setq jgqn-pwd newdir))
-  
-  (delete-minibuffer-contents)
-  
-  (jgqn-show-results))
+  (unless (s-equals-p "" (jgqn-pwd))
+    (let* ((tokens (s-split "/" (jgqn-pwd)))
+           (olddir (last tokens))
+           (tokens (butlast tokens))
+           (newdir (s-join "/" tokens)))
+      (push olddir jgqn-history)
+      (jgqn-cleanup)
+      (setq jgqn-pwd newdir))
+    (delete-minibuffer-contents)
+    (jgqn-show-results)))
 
 (defun jgqn-downdir ()
   "Go back 'forward' after calling `jgqn-updir'"
@@ -340,10 +349,32 @@ is a directory."
       (let ((new-pwd (s-join "/" (cons (jgqn-pwd) (pop jgqn-history)))))
         (jgqn-cleanup)
         (setq jgqn-pwd new-pwd)
+        (delete-minibuffer-contents)
         (jgqn-show-results))
     (ding)))
 
 
+
+(defun jgqn-find-file ()
+  "Open the file named by the minibuffer contents. If it doesn't exist, create it"
+  (interactive)
+  (let ((filename (minibuffer-contents)))
+    (find-file (concat (jgqn-pwd) "/" filename))
+    (setq jgqn-file-or-dir-to-visit filename))
+  (exit-minibuffer))
+
+(defun jgqn-dired ()
+  "Open a dired buffer with the current directory."
+  (interactive)
+  (let ((dir (car (last (s-split "/" (jgqn-pwd))))))
+    (dired (jgqn-pwd))
+    (setq jgqn-file-or-dir-to-visit dir)
+    (exit-minibuffer)))
+
+
+;;===============================
+;; setting/changing the selection:
+;;===============================
 (defun jgqn-set-selection-index (new-index)
   "Generic function to set the selection in `jg-quicknav-buffer' to NEW-INDEX"
   (interactive)
