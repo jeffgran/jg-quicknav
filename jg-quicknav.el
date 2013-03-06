@@ -12,6 +12,20 @@
 
 ;;; Commentary:
 
+;; A quick file-finder for emacs. Navigate up and down directories to find a file.
+;;
+;; Usage: - assign `jg-quicknav' to a key, and use it.
+;;        - buffer will show you the directory listing for the current default directory
+;;          (reminder: if you're in a file buffer, that will be the directory
+;;          that file is in. If you're in shell-mode, eshell, ansi-term, dired, etc,
+;;          that will be the correct current directory).
+;;        - type some letters to filter down the results. C-n and C-p to change selection
+;;        - RET on a file to open the file, or RET on a directory to `jg-quicknav' that dir.
+;;        - C-, to go "up a directory", after which you can go "forward" with C-.
+;;        - Drop into dired with C-/
+;;        - I tried to make it easy to rebind the bindings. I rebind everything all the time
+;;          so I was sure others would not like my key choices. see below.
+;;
 ;; Like ido-find-file, lusty-explorer, helm/anything, etc. But none of them
 ;; did quite what I wanted so I created this. The goal is to navigate the file 
 ;; system as fast as possible. Like a much faster way of doing the...
@@ -101,7 +115,6 @@ to go `jgqn-downdir' (forwards) after going `jgqn-updir' (backwards)")
 (define-key jg-quicknav-mode-map (kbd "M-<") 'jgqn-first)
 (define-key jg-quicknav-mode-map (kbd "M->") 'jgqn-last)
 
-;;(define-key jg-quicknav-mode-map (kbd "C-e") 'jgqn-show-results)
 (define-key jg-quicknav-mode-map (kbd "C-g") 'jgqn-minibuffer-exit)
 (define-key jg-quicknav-mode-map (kbd "RET") 'jgqn-visit-file-or-dir)
 (define-key jg-quicknav-mode-map (kbd "C-j") 'jgqn-visit-file-or-dir)

@@ -5,13 +5,27 @@
 ;; Author: Jeff Gran <jeff@jeffgran.com>
 ;; Created: 3 Mar 2013
 ;; Keywords: navigation
-;; Version: 1.0.1
+;; Version: 1.1.0
 ;; Package-Requires: ((s))
 
 ;; This file is not part of GNU Emacs.
 
 ;;; Commentary:
 
+;; A quick file-finder for emacs. Navigate up and down directories to find a file.
+;;
+;; Usage: - assign `jg-quicknav' to a key, and use it.
+;;        - buffer will show you the directory listing for the current default directory
+;;          (reminder: if you're in a file buffer, that will be the directory
+;;          that file is in. If you're in shell-mode, eshell, ansi-term, dired, etc,
+;;          that will be the correct current directory).
+;;        - type some letters to filter down the results. C-n and C-p to change selection
+;;        - RET on a file to open the file, or RET on a directory to `jg-quicknav' that dir.
+;;        - C-, to go "up a directory", after which you can go "forward" with C-.
+;;        - Drop into dired with C-/
+;;        - I tried to make it easy to rebind the bindings. I rebind everything all the time
+;;          so I was sure others would not like my key choices. see below.
+;;
 ;; Like ido-find-file, lusty-explorer, helm/anything, etc. But none of them
 ;; did quite what I wanted so I created this. The goal is to navigate the file 
 ;; system as fast as possible. Like a much faster way of doing the...
@@ -32,13 +46,12 @@
 ;; 
 ;;
 ;; TODO:
-;; - add a command/keybinding to create new file in current directory
+;; - use save-excursion or something instead of kill-window (had this mess up my windows once)
 ;; - when updating results, clamp the selection index to the number of results
 ;;   so it doesn't disappear off the end
 ;; - different face/color for executables? or just the "*"?
-;; - hotkey to go directly to dired?
+;;   - and different face for file extensions? (just like dired+)
 ;; - secondary-highlight for previous dir after going 'updir'
-;; - use save-excursion instead of kill-window?
 ;; - make it work remotely? with TRAMP maybe?
 ;; - shell-mode plugin to "cd" to a directory chosen via jgqn?
 
@@ -49,3 +62,10 @@
 ;;            - use overriding-local-map in minibuffer to make sure
 ;;              the jgqn keys override other minor modes during navigation
 ;;            - bugfix: clear out "history" in between sessions
+;; 2013-03-05 v 1.1.0
+;;            - fixed weirdness when going "back" when already at the root directory
+;;            - added `jgqn-find-file' -- key command to open a buffer for a new file
+;;              with the contents of the minibuffer as the filename, in the same directory
+;;              currently being shown
+;;            - added `jgqn-dired' -- key command to drop into dired in the same directory
+;;              currently being shown
