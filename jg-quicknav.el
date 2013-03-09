@@ -5,7 +5,7 @@
 ;; Author: Jeff Gran <jeff@jeffgran.com>
 ;; Created: 3 Mar 2013
 ;; Keywords: navigation
-;; Version: 1.1.0
+;; Version: 1.1.1
 ;; Package-Requires: ((s))
 
 ;; This file is not part of GNU Emacs.
@@ -14,6 +14,17 @@
 
 ;; A quick file-finder for emacs. Navigate up and down directories to find a file.
 ;;
+;; Like ido-find-file, lusty-explorer, helm/anything, etc. But none of them
+;; did quite what I wanted so I created this. The goal is to navigate the file 
+;; system as fast as possible. Like a much faster way of doing the...
+;; 
+;;  1. cd <foo>
+;;  2. ls
+;;  3. goto 1
+;;  4. <open file>
+;;  
+;;  ...loop in the shell.
+;;  
 ;; Usage: - assign `jg-quicknav' to a key, and use it.
 ;;        - buffer will show you the directory listing for the current default directory
 ;;          (reminder: if you're in a file buffer, that will be the directory
@@ -26,15 +37,6 @@
 ;;        - I tried to make it easy to rebind the bindings. I rebind everything all the time
 ;;          so I was sure others would not like my key choices. see below.
 ;;
-;; Like ido-find-file, lusty-explorer, helm/anything, etc. But none of them
-;; did quite what I wanted so I created this. The goal is to navigate the file 
-;; system as fast as possible. Like a much faster way of doing the...
-;; 
-;;  1. cd <foo>
-;;  2. ls
-;;  3. goto 1
-;;  
-;;  ...loop in the shell.
 ;;
 ;;
 ;; You'll likely want to change some of the key bindings. Just redefine the keys
@@ -46,12 +48,10 @@
 ;; 
 ;;
 ;; TODO:
-;; - use save-excursion or something instead of kill-window (had this mess up my windows once)
-;; - when updating results, clamp the selection index to the number of results
-;;   so it doesn't disappear off the end
 ;; - different face/color for executables? or just the "*"?
 ;;   - and different face for file extensions? (just like dired+)
 ;; - secondary-highlight for previous dir after going 'updir'
+;; - add a buffer-switcher too?
 ;; - make it work remotely? with TRAMP maybe?
 ;; - shell-mode plugin to "cd" to a directory chosen via jgqn?
 
@@ -69,6 +69,14 @@
 ;;              currently being shown
 ;;            - added `jgqn-dired' -- key command to drop into dired in the same directory
 ;;              currently being shown
+;; 2013-03-09 v 1.1.1
+;;            - fixed bug: opening multiple files of the same name doesn't work
+;;            - fixed bug: doesn't show / when / is the jgqn-default-dir
+;;            - fixed bug: use save-window-excursion instead of delete-window when session 
+;;              ends. this ensures your window configuration will look the same before and
+;;              after the jgqn session
+;;            - fixed bug: when updating results, clamp the selection index to the number
+;;               of results so it doesn't disappear off the end
 
 ;;; Code:
 
@@ -117,7 +125,8 @@ to go `jgqn-downdir' (forwards) after going `jgqn-updir' (backwards)")
 
 (define-key jg-quicknav-mode-map (kbd "C-g") 'jgqn-minibuffer-exit)
 (define-key jg-quicknav-mode-map (kbd "RET") 'jgqn-visit-file-or-dir)
-(define-key jg-quicknav-mode-map (kbd "C-j") 'jgqn-visit-file-or-dir)
+(define-key jg-quicknav-mode-map (kbd "TAB") 'jgqn-visit-file-or-dir)
+;;(define-key jg-quicknav-mode-map (kbd "C-j") 'jgqn-visit-file-or-dir)
 (define-key jg-quicknav-mode-map (kbd "C-,") 'jgqn-updir)
 (define-key jg-quicknav-mode-map (kbd "C-.") 'jgqn-downdir)
 (define-key jg-quicknav-mode-map (kbd "C-o") 'jgqn-find-file)
@@ -132,10 +141,11 @@ to go `jgqn-downdir' (forwards) after going `jgqn-updir' (backwards)")
 
 (defun jgqn-ls ()
   "Get the result of `ls` for the current directory (`jgqn-pwd') in a string."
+  
   (or jgqn-ls
       (setq jgqn-ls (shell-command-to-string
                      (concat "cd "
-                             (jgqn-pwd)
+                             (concat (jgqn-pwd) "/")
                              " && ls -1AF")))))
 
 (defun jgqn-pwd ()
@@ -150,15 +160,14 @@ Must not have a trailing /."
 (defun jg-quicknavigating-p ()
   "Returns t if in a `jg-quicknav' session, nil otherwise."
   (and (minibufferp)
-       (memq jg-quicknav-mode-map (current-minor-mode-maps))
-       ))
+       (memq jg-quicknav-mode-map (current-minor-mode-maps))))
 
 (defun jgqn-initialize ()
   "Initialize the hooks and advice for `jg-quicknav' mode"
   (or jgqn-initialized
       (progn
         (add-hook 'minibuffer-setup-hook 'jgqn-minibuffer-setup)
-        (add-hook 'minibuffer-exit-hook 'jgqn-minibuffer-teardown)
+        ;;(add-hook 'minibuffer-exit-hook 'jgqn-minibuffer-teardown)
 
         ;; TODO make this optional? could be annoying
         (defadvice delete-backward-char (around jgqn-delete-backward-char activate)
@@ -166,8 +175,7 @@ Must not have a trailing /."
           (if (and (jg-quicknavigating-p)
                    (eq 0 (length (jgqn-get-minibuffer-string))))
               (jgqn-updir)
-            ad-do-it)
-          )
+            ad-do-it))
         ;; this wasn't working and seems maybe not necessary
         ;; (defadvice backward-word-kill (around jgqn-delete-backward-word activate)
         ;;   "Go up a directory instead of backspacing when the minibuffer is empty during `jg-quicknav'"
@@ -198,17 +206,23 @@ is the standard `minibuffer-local-map') while navigating:
   (with-current-buffer jg-quicknav-buffer
     (setq buffer-read-only t))
 
-  (display-buffer jg-quicknav-buffer)
-  (jgqn-show-results)
+  (save-window-excursion
+    (display-buffer jg-quicknav-buffer)
+    (jgqn-show-results)
 
-  (jgqn-initialize)
+    (jgqn-initialize)
 
-  (read-string (concat "Current Directory: " (jgqn-pwd) "/"))
+    ;; apparently people override this sometimes so I have override it to fix it :/
+    (setq this-command 'jg-quicknav)
+
+    (read-string (concat "Current Directory: " (jgqn-pwd) "/")))
+  
   (if jgqn-file-or-dir-to-visit
-      (switch-to-buffer jgqn-file-or-dir-to-visit))
+      (switch-to-buffer (get-file-buffer jgqn-file-or-dir-to-visit)))
   (jgqn-cleanup)
   (setq jgqn-history nil)
-  (jgqn-delete-window))
+    
+  (kill-buffer jg-quicknav-buffer))
 
 
 
@@ -241,8 +255,13 @@ changing directories, or after changing the minibuffer text."
         (if new-lines
             (insert (mapconcat 'identity new-lines "\n")))
         (newline)
-        (jgqn-update-faces)
-        ))))
+        ;; clamp the selected line to make sure it's still visible
+        (when (> jgqn-selection-index (length new-lines))
+          (setq jgqn-selection-index (length new-lines)))
+        
+        )))
+  ;; now update the faces.
+  (jgqn-update-faces))
 
 (defun jgqn-sort-and-filter (list query)
   "Filter LIST by using 'fuzzy-matching' against QUERY.
@@ -260,34 +279,17 @@ Turns out this is my favorite fuzzy matching/sorting algorithm."
   (insert (jgqn-pwd))
   (insert "/")
   (insert (or query-string ""))
-  (insert "\n\n")
-  )
+  (insert "\n\n"))
+
 
 (defun jgqn-minibuffer-setup ()
   "For assigning to the `minibuffer-setup-hook' to set up for a `jg-quicknav' session"
   (when (eq this-command 'jg-quicknav)
     (jg-quicknav-mode t)
-    ;; t for local-only
     (setq overriding-local-map jg-quicknav-mode-map)
-    (add-hook 'post-command-hook 'jgqn-show-results nil t)))
+    (add-hook 'post-command-hook 'jgqn-show-results nil t)))     ; t for local-only
 
 
-;; I'm not even using this in most places -- it seems to be useless.
-(defun jgqn-minibuffer-teardown ()
-  "For assigning to the `minibuffer-exit-hook' to clean up after a `jg-quicknav' session."
-  (when (eq this-command 'jgqn-minibuffer-exit)
-    (jg-quicknav-mode nil)
-    (remove-hook 'post-command-hook 'jgqn-show-results t)))
-
-
-(defun jgqn-delete-window ()
-  "Called after canceling or selecting a file during `jg-quicknav'
-
-This function will delete the window that the `jg-quicknav-buffer' was in."
-  (dolist (win (window-list))                                                                                  
-    (when (string= (buffer-name (window-buffer win)) (buffer-name jg-quicknav-buffer))
-      (delete-window win)
-      (kill-buffer jg-quicknav-buffer))))
 
 (defun jgqn-minibuffer-exit ()
   "Wrapper around `exit-minibuffer' in order to know if we just exited a
@@ -434,7 +436,7 @@ and without a trailing / if it was there"
   (goto-line (+ 2 jgqn-selection-index)) ;; + 2 to account for the status line and blank line
   (let ((line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
     ;; remove the trailing executable or directory indicator
-    (s-chop-suffixes '("*" "/") line))
+    (s-chop-suffixes '("@" "*" "/") line))
   )
 
 
