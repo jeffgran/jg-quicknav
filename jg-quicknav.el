@@ -224,6 +224,10 @@ is the standard `minibuffer-local-map') while navigating:
     
   (kill-buffer jg-quicknav-buffer))
 
+(defun jg-quicknav-dired ()
+  (interactive)
+  (setq this-command 'jgqn-quicknav-dired)
+  (read-string (concat "Current Directory: " (jgqn-pwd) "/")))
 
 
 (defun jgqn-cleanup ()
@@ -281,13 +285,37 @@ Turns out this is my favorite fuzzy matching/sorting algorithm."
   (insert (or query-string ""))
   (insert "\n\n"))
 
+(defadvice message (around dont-message activate disable)
+  nil)
+
+(defmacro suppress-messages (&rest body)
+  `(progn
+     (ad-enable-advice 'message 'around 'dont-message)
+     (ad-activate 'message)
+
+     ,@body
+
+     (ad-disable-advice 'message 'around 'dont-message)
+     (ad-activate 'message)))
+
+(defun jgqn-filter-dired ()
+  (interactive)
+  (let ((query (explode-to-regexp (jgqn-get-minibuffer-string))))
+    (with-current-buffer (cdr (first dired-buffers))
+      (suppress-messages
+       (revert-buffer)
+       (dired-mark-files-regexp query)
+       (dired-toggle-marks)
+       (dired-do-kill-lines)))))
 
 (defun jgqn-minibuffer-setup ()
   "For assigning to the `minibuffer-setup-hook' to set up for a `jg-quicknav' session"
-  (when (eq this-command 'jg-quicknav)
-    (jg-quicknav-mode t)
-    (setq overriding-local-map jg-quicknav-mode-map)
-    (add-hook 'post-command-hook 'jgqn-show-results nil t)))     ; t for local-only
+  (cond ((eq this-command 'jg-quicknav)
+         (jg-quicknav-mode t)
+         (setq overriding-local-map jg-quicknav-mode-map)
+         (add-hook 'post-command-hook 'jgqn-show-results nil t))          ; t for local-only
+        ((eq this-command 'jgqn-quicknav-dired)
+         (add-hook 'post-command-hook 'jgqn-filter-dired nil t))))
 
 
 
