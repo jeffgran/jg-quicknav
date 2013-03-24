@@ -5,8 +5,8 @@
 ;; Author: Jeff Gran <jeff@jeffgran.com>
 ;; Created: 3 Mar 2013
 ;; Keywords: navigation
-;; Version: 1.1.1
-;; Package-Requires: ((s))
+;; Version: 1.2.0
+;; Package-Requires: ((s) (dired))
 
 ;; This file is not part of GNU Emacs.
 
@@ -77,6 +77,14 @@
 ;;              after the jgqn session
 ;;            - fixed bug: when updating results, clamp the selection index to the number
 ;;               of results so it doesn't disappear off the end
+;; 2013-03-23 v 1.2.0
+;;            - added jg-quicknav-dired. use it to fuzzy-filter a dired buffer
+;;            - added (and made default) different behavior for C-g. Now it will clear the
+;;              minibuffer input (if any) the first time you press it, and then quit the
+;;              quicknav session the second time. To go back to previous behavior (C-g
+;;              always quits), set "C-g" to 'jgqn-minibuffer-exit instead of
+;;              'jgqn-minibuffer-clear-then-exit in the jg-quicknav-mode-map
+;;            
 
 ;;; Code:
 
@@ -123,7 +131,7 @@ to go `jgqn-downdir' (forwards) after going `jgqn-updir' (backwards)")
 (define-key jg-quicknav-mode-map (kbd "M-<") 'jgqn-first)
 (define-key jg-quicknav-mode-map (kbd "M->") 'jgqn-last)
 
-(define-key jg-quicknav-mode-map (kbd "C-g") 'jgqn-minibuffer-exit)
+(define-key jg-quicknav-mode-map (kbd "C-g") 'jgqn-minibuffer-clear-then-exit)
 (define-key jg-quicknav-mode-map (kbd "RET") 'jgqn-visit-file-or-dir)
 (define-key jg-quicknav-mode-map (kbd "TAB") 'jgqn-visit-file-or-dir)
 ;;(define-key jg-quicknav-mode-map (kbd "C-j") 'jgqn-visit-file-or-dir)
@@ -326,6 +334,12 @@ Turns out this is my favorite fuzzy matching/sorting algorithm."
   ;;(ding)
   (exit-minibuffer))
 
+(defun jgqn-minibuffer-clear-then-exit ()
+  (interactive)
+  (let ((minibuffer-string (jgqn-get-minibuffer-string)))
+    (if (> (length minibuffer-string) 0)
+        (delete-region (minibuffer-prompt-end) (point-max))
+      (jgqn-minibuffer-exit))))
 
 (defun jgqn-update-minibuffer-prompt ()
   "Updates the minibuffer prompt to show the updated current directory."
