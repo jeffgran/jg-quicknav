@@ -5,8 +5,8 @@
 ;; Author: Jeff Gran <jeff@jeffgran.com>
 ;; Created: 3 Mar 2013
 ;; Keywords: navigation
-;; Version: 1.1.1
-;; Package-Requires: ((s))
+;; Version: 1.2.0
+;; Package-Requires: ((s) (dired))
 
 ;; This file is not part of GNU Emacs.
 
@@ -77,3 +77,10 @@
 ;;              after the jgqn session
 ;;            - fixed bug: when updating results, clamp the selection index to the number
 ;;               of results so it doesn't disappear off the end
+;; 2013-03-23 v 1.2.0
+;;            - added jg-quicknav-dired. use it to fuzzy-filter a dired buffer
+;;            - added (and made default) different behavior for C-g. Now it will clear the
+;;              minibuffer input (if any) the first time you press it, and then quit the
+;;              quicknav session the second time. To go back to previous behavior (C-g
+;;              always quits), set "C-g" to 'jgqn-minibuffer-exit instead of
+;;              'jgqn-minibuffer-clear-then-exit in the jg-quicknav-mode-map
