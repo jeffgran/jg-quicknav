@@ -5,8 +5,8 @@
 ;; Author: Jeff Gran <jeff@jeffgran.com>
 ;; Created: 3 Mar 2013
 ;; Keywords: navigation
-;; Version: 1.2.0
-;; Package-Requires: ((s) (dired))
+;; Version: 1.2.1
+;; Package-Requires: ((s))
 
 ;; This file is not part of GNU Emacs.
 
@@ -48,12 +48,12 @@
 ;; 
 ;;
 ;; TODO:
+;; - shell-mode plugin to "cd" to a directory chosen via jgqn?
+;; - secondary-highlight for previous dir after going 'updir'
 ;; - different face/color for executables? or just the "*"?
 ;;   - and different face for file extensions? (just like dired+)
-;; - secondary-highlight for previous dir after going 'updir'
 ;; - add a buffer-switcher too?
 ;; - make it work remotely? with TRAMP maybe?
-;; - shell-mode plugin to "cd" to a directory chosen via jgqn?
 
 ;;; History:
 
@@ -84,7 +84,9 @@
 ;;              quicknav session the second time. To go back to previous behavior (C-g
 ;;              always quits), set "C-g" to 'jgqn-minibuffer-exit instead of
 ;;              'jgqn-minibuffer-clear-then-exit in the jg-quicknav-mode-map
-;;            
+;; 2013-03-29 v 1.2.1
+;;            - fixed small annoyance: if you narrow to zero results then delete,
+;;              clamp selection index to 1 otherwise it disappears until you move it again.
 
 ;;; Code:
 
@@ -139,6 +141,8 @@ to go `jgqn-downdir' (forwards) after going `jgqn-updir' (backwards)")
 (define-key jg-quicknav-mode-map (kbd "C-.") 'jgqn-downdir)
 (define-key jg-quicknav-mode-map (kbd "C-o") 'jgqn-find-file)
 (define-key jg-quicknav-mode-map (kbd "C-/") 'jgqn-dired)
+
+(define-key jg-quicknav-mode-map (kbd "C-d") 'jgqn-shell-cd)
 
 
 (define-minor-mode jg-quicknav-mode
@@ -227,15 +231,19 @@ is the standard `minibuffer-local-map') while navigating:
   
   (if jgqn-file-or-dir-to-visit
       (switch-to-buffer (get-file-buffer jgqn-file-or-dir-to-visit)))
+  
   (jgqn-cleanup)
   (setq jgqn-history nil)
     
   (kill-buffer jg-quicknav-buffer))
 
 (defun jg-quicknav-dired ()
+  "Initiate a quicknav-like session from within dired. i.e. fuzzy-filter the
+dired buffer."
   (interactive)
   (setq this-command 'jgqn-quicknav-dired)
   (read-string (concat "Current Directory: " (jgqn-pwd) "/")))
+
 
 
 (defun jgqn-cleanup ()
@@ -248,28 +256,28 @@ in order to start anew with a new directory"
 
 (defun jgqn-show-results ()
   "General purpose function to update the minibuffer prompt and update the
-`jg-quicknav-buffer' with the latest (maybe filtered) results. Called when starting a session,
-changing directories, or after changing the minibuffer text."
+`jg-quicknav-buffer' with the latest (maybe filtered) results. Called when
+starting a session, changing directories, or after changing the minibuffer text."
 
   (interactive)
   (jgqn-update-minibuffer-prompt)
 
   (let ((query-string (jgqn-get-minibuffer-string)))
     (with-current-buffer jg-quicknav-buffer
-      (let* (
-             (new-lines (jgqn-sort-and-filter
+      (let* ((new-lines (jgqn-sort-and-filter
                          (s-split "\n" (jgqn-ls) t)
                          query-string))
-             (buffer-read-only nil)
-             )
+             (buffer-read-only nil))
         (erase-buffer)
-        (jgqn-status-line query-string)
+        (jgqn-insert-status-line query-string)
         (if new-lines
             (insert (mapconcat 'identity new-lines "\n")))
         (newline)
         ;; clamp the selected line to make sure it's still visible
-        (when (> jgqn-selection-index (length new-lines))
-          (setq jgqn-selection-index (length new-lines)))
+        (if (> jgqn-selection-index (length new-lines))
+            (setq jgqn-selection-index (length new-lines))
+          (when (< jgqn-selection-index 1)
+            (setq jgqn-selection-index 1)))
         
         )))
   ;; now update the faces.
@@ -287,16 +295,18 @@ Turns out this is my favorite fuzzy matching/sorting algorithm."
                                 (< (length s1) (length s2))
                               (string< s1 s2))))))
 
-(defun jgqn-status-line (query-string)
+(defun jgqn-insert-status-line (query-string)
   (insert (jgqn-pwd))
   (insert "/")
   (insert (or query-string ""))
   (insert "\n\n"))
 
 (defadvice message (around dont-message activate disable)
+  "Override `message' to not message anything."
   nil)
 
 (defmacro suppress-messages (&rest body)
+  "Don't display any messages in the mibuffer while evaluating BODY."
   `(progn
      (ad-enable-advice 'message 'around 'dont-message)
      (ad-activate 'message)
@@ -307,6 +317,8 @@ Turns out this is my favorite fuzzy matching/sorting algorithm."
      (ad-activate 'message)))
 
 (defun jgqn-filter-dired ()
+  "Do the actual fuzzy-filtering of a dired buffer. Called after each character
+is typed."
   (interactive)
   (let ((query (explode-to-regexp (jgqn-get-minibuffer-string))))
     (with-current-buffer (cdr (first dired-buffers))
@@ -335,6 +347,7 @@ Turns out this is my favorite fuzzy matching/sorting algorithm."
   (exit-minibuffer))
 
 (defun jgqn-minibuffer-clear-then-exit ()
+  "Clear the minibuffer input if any, and if not, quit the jg-quicknav session."
   (interactive)
   (let ((minibuffer-string (jgqn-get-minibuffer-string)))
     (if (> (length minibuffer-string) 0)
@@ -421,12 +434,36 @@ is a directory."
   (exit-minibuffer))
 
 (defun jgqn-dired ()
-  "Open a dired buffer with the current directory."
+  "Open a dired buffer with the current directory, from inside a quicknav session."
   (interactive)
   (let ((dir (car (last (s-split "/" (jgqn-pwd))))))
     (dired (jgqn-pwd))
     (setq jgqn-file-or-dir-to-visit dir)
     (exit-minibuffer)))
+
+;; mostly lifted from (shell-resync-dirs) in shell.el
+(defun jgqn-shell-cd ()
+  (interactive)
+  ;; not (current-buffer) -- previous buffer...
+  ;; no... most recent buffer that has a shell process, or
+  ;; create a new shell buffer.
+  (if (get-buffer-process (current-buffer))
+      (let* ((proc (get-buffer-process (current-buffer)))
+             (pmark (process-mark proc))
+             (started-at-pmark (= (point) (marker-position pmark))))
+        (save-excursion
+          (goto-char pmark)
+          ;; If the process echoes commands, don't insert a fake command in
+          ;; the buffer or it will appear twice.
+          (unless comint-process-echoes
+            (insert (concat "cd " (jgqn-pwd))) (insert "\n"))
+          (sit-for 0)			; force redisplay
+          (comint-send-string proc (concat "cd " (jgqn-pwd)))
+          (comint-send-string proc "\n"))
+        (if started-at-pmark (goto-char (marker-position pmark))))
+    ;; no process -- this is not a shell buffer.
+    (ding)))
+
 
 
 ;;===============================

@@ -5,8 +5,8 @@
 ;; Author: Jeff Gran <jeff@jeffgran.com>
 ;; Created: 3 Mar 2013
 ;; Keywords: navigation
-;; Version: 1.2.0
-;; Package-Requires: ((s) (dired))
+;; Version: 1.2.1
+;; Package-Requires: ((s))
 
 ;; This file is not part of GNU Emacs.
 
@@ -48,12 +48,12 @@
 ;; 
 ;;
 ;; TODO:
+;; - shell-mode plugin to "cd" to a directory chosen via jgqn?
+;; - secondary-highlight for previous dir after going 'updir'
 ;; - different face/color for executables? or just the "*"?
 ;;   - and different face for file extensions? (just like dired+)
-;; - secondary-highlight for previous dir after going 'updir'
 ;; - add a buffer-switcher too?
 ;; - make it work remotely? with TRAMP maybe?
-;; - shell-mode plugin to "cd" to a directory chosen via jgqn?
 
 ;;; History:
 
@@ -84,3 +84,6 @@
 ;;              quicknav session the second time. To go back to previous behavior (C-g
 ;;              always quits), set "C-g" to 'jgqn-minibuffer-exit instead of
 ;;              'jgqn-minibuffer-clear-then-exit in the jg-quicknav-mode-map
+;; 2013-03-29 v 1.2.1
+;;            - fixed small annoyance: if you narrow to zero results then delete,
+;;              clamp selection index to 1 otherwise it disappears until you move it again.
