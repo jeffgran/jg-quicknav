@@ -5,7 +5,7 @@
 ;; Author: Jeff Gran <jeff@jeffgran.com>
 ;; Created: 3 Mar 2013
 ;; Keywords: navigation
-;; Version: 1.2.1
+;; Version: 1.3.0
 ;; Package-Requires: ((s))
 
 ;; This file is not part of GNU Emacs.
@@ -48,12 +48,13 @@
 ;; 
 ;;
 ;; TODO:
+;; - dir with space in name results in error. wrap `cd` command in quotes.
+;; - ensure-cursor-visible or something in case selection is off the screen
 ;; - shell-mode plugin to "cd" to a directory chosen via jgqn?
 ;; - secondary-highlight for previous dir after going 'updir'
 ;; - different face/color for executables? or just the "*"?
 ;;   - and different face for file extensions? (just like dired+)
 ;; - add a buffer-switcher too?
-;; - make it work remotely? with TRAMP maybe?
 
 ;;; History:
 
@@ -87,6 +88,12 @@
 ;; 2013-03-29 v 1.2.1
 ;;            - fixed small annoyance: if you narrow to zero results then delete,
 ;;              clamp selection index to 1 otherwise it disappears until you move it again.
+;; 2013-04-14 v 1.3.0
+;;            - Now works remotely! You must be using tramp. This means that if you are
+;;              visiting a remote file, or if you are in an ssh shell backed by tramp,
+;;              you can use jg-quicknav and it will show the listing of the corresponding
+;;              remote directory.
+;;            - fixed annoying blinking selection line when list is empty
 
 ;;; Code:
 
@@ -129,7 +136,9 @@ to go `jgqn-downdir' (forwards) after going `jgqn-updir' (backwards)")
 
 (set-keymap-parent jg-quicknav-mode-map minibuffer-local-map)
 (define-key jg-quicknav-mode-map (kbd "C-n") 'jgqn-next)
+(define-key jg-quicknav-mode-map (kbd "<down>") 'jgqn-next)
 (define-key jg-quicknav-mode-map (kbd "C-p") 'jgqn-prev)
+(define-key jg-quicknav-mode-map (kbd "<up>") 'jgqn-prev)
 (define-key jg-quicknav-mode-map (kbd "M-<") 'jgqn-first)
 (define-key jg-quicknav-mode-map (kbd "M->") 'jgqn-last)
 
@@ -153,12 +162,17 @@ to go `jgqn-downdir' (forwards) after going `jgqn-updir' (backwards)")
 
 (defun jgqn-ls ()
   "Get the result of `ls` for the current directory (`jgqn-pwd') in a string."
-  
   (or jgqn-ls
-      (setq jgqn-ls (shell-command-to-string
-                     (concat "cd "
-                             (concat (jgqn-pwd) "/")
-                             " && ls -1AF")))))
+      (setq jgqn-ls
+            (let ((the-pwd (if (tramp-tramp-file-p (jgqn-pwd))
+                               (with-parsed-tramp-file-name (jgqn-pwd) pwd
+                                 pwd-localname)
+                             (jgqn-pwd))))
+              (shell-command-to-string
+               (concat "cd "
+                       (concat the-pwd "/")
+                       " && ls -1AF"))))))
+
 
 (defun jgqn-pwd ()
   "The current directory while navigating via `jg-quicknav' 
@@ -188,14 +202,6 @@ Must not have a trailing /."
                    (eq 0 (length (jgqn-get-minibuffer-string))))
               (jgqn-updir)
             ad-do-it))
-        ;; this wasn't working and seems maybe not necessary
-        ;; (defadvice backward-word-kill (around jgqn-delete-backward-word activate)
-        ;;   "Go up a directory instead of backspacing when the minibuffer is empty during `jg-quicknav'"
-        ;;   (if (and (jg-quicknavigating-p)
-        ;;            (eq 0 (length (jgqn-get-minibuffer-string))))
-        ;;       (jgqn-updir)
-        ;;     ad-do-it)
-        ;;   )
         (setq jgqn-initialized t))))
 
 (defun jg-quicknav ()
@@ -214,7 +220,7 @@ is the standard `minibuffer-local-map') while navigating:
 
   ;; get or create the buffer for showing the list
   (setq jg-quicknav-buffer (get-buffer-create "*quicknav*"))
-  
+
   (with-current-buffer jg-quicknav-buffer
     (setq buffer-read-only t))
 
@@ -234,7 +240,7 @@ is the standard `minibuffer-local-map') while navigating:
   
   (jgqn-cleanup)
   (setq jgqn-history nil)
-    
+  
   (kill-buffer jg-quicknav-buffer))
 
 (defun jg-quicknav-dired ()
@@ -275,9 +281,9 @@ starting a session, changing directories, or after changing the minibuffer text.
         (newline)
         ;; clamp the selected line to make sure it's still visible
         (if (> jgqn-selection-index (length new-lines))
-            (setq jgqn-selection-index (length new-lines))
-          (when (< jgqn-selection-index 1)
-            (setq jgqn-selection-index 1)))
+            (setq jgqn-selection-index (length new-lines)))
+        (when (< jgqn-selection-index 1)
+          (setq jgqn-selection-index 1))
         
         )))
   ;; now update the faces.
@@ -333,7 +339,8 @@ is typed."
   (cond ((eq this-command 'jg-quicknav)
          (jg-quicknav-mode t)
          (setq overriding-local-map jg-quicknav-mode-map)
-         (add-hook 'post-command-hook 'jgqn-show-results nil t))          ; t for local-only
+         (add-hook 'post-command-hook 'jgqn-show-results nil t)                            ; t for local-only
+         )
         ((eq this-command 'jgqn-quicknav-dired)
          (add-hook 'post-command-hook 'jgqn-filter-dired nil t))))
 
