@@ -5,7 +5,7 @@
 ;; Author: Jeff Gran <jeff@jeffgran.com>
 ;; Created: 3 Mar 2013
 ;; Keywords: navigation
-;; Version: 1.3.0
+;; Version: 1.3.1
 ;; Package-Requires: ((s))
 
 ;; This file is not part of GNU Emacs.
@@ -47,14 +47,16 @@
 ;; (define-key jg-quicknav-mode-map (kbd "M-n") 'jgqn-next)
 ;; 
 ;;
-;; TODO:
-;; - dir with space in name results in error. wrap `cd` command in quotes.
-;; - ensure-cursor-visible or something in case selection is off the screen
+;; TODO/IDEAS:
+;; - better support for dirs with many files in them
+;;   - ensure-cursor-visible or something in case selection is off the screen
+;;   - also page-down and page-up support for long lists
+;;   - maybe add an option to toggle showing only files/only dirs?
 ;; - shell-mode plugin to "cd" to a directory chosen via jgqn?
 ;; - secondary-highlight for previous dir after going 'updir'
 ;; - different face/color for executables? or just the "*"?
 ;;   - and different face for file extensions? (just like dired+)
-;; - add a buffer-switcher too?
+;; - add a jg-quick-buffer-switcher too?
 
 ;;; History:
 
@@ -94,6 +96,9 @@
 ;;              you can use jg-quicknav and it will show the listing of the corresponding
 ;;              remote directory.
 ;;            - fixed annoying blinking selection line when list is empty
+;; 2013-04-28 v 1.3.1
+;;            - fixed bug: dir with space in name results in error. wrap `cd` command in quotes.
+
 
 ;;; Code:
 
@@ -168,10 +173,15 @@ to go `jgqn-downdir' (forwards) after going `jgqn-updir' (backwards)")
                                (with-parsed-tramp-file-name (jgqn-pwd) pwd
                                  pwd-localname)
                              (jgqn-pwd))))
-              (shell-command-to-string
-               (concat "cd "
-                       (concat the-pwd "/")
-                       " && ls -1AF"))))))
+              (let ((prev-shell-file-name shell-file-name))
+                (prog2
+                  (setq-default shell-file-name "/bin/bash")
+                  (shell-command-to-string
+                     (concat "cd '"
+                             (concat the-pwd "/")
+                             "' && ls -1AF"))
+                  (setq-default shell-file-name prev-shell-file-name))
+                )))))
 
 
 (defun jgqn-pwd ()
@@ -270,10 +280,11 @@ starting a session, changing directories, or after changing the minibuffer text.
 
   (let ((query-string (jgqn-get-minibuffer-string)))
     (with-current-buffer jg-quicknav-buffer
-      (let* ((new-lines (jgqn-sort-and-filter
-                         (s-split "\n" (jgqn-ls) t)
-                         query-string))
-             (buffer-read-only nil))
+      
+      (let ((new-lines (jgqn-sort-and-filter
+                        (s-split "\n" (jgqn-ls) t)
+                        query-string))
+            (buffer-read-only nil))
         (erase-buffer)
         (jgqn-insert-status-line query-string)
         (if new-lines
@@ -283,9 +294,8 @@ starting a session, changing directories, or after changing the minibuffer text.
         (if (> jgqn-selection-index (length new-lines))
             (setq jgqn-selection-index (length new-lines)))
         (when (< jgqn-selection-index 1)
-          (setq jgqn-selection-index 1))
-        
-        )))
+          (setq jgqn-selection-index 1)))))
+
   ;; now update the faces.
   (jgqn-update-faces))
 
@@ -338,6 +348,8 @@ is typed."
   "For assigning to the `minibuffer-setup-hook' to set up for a `jg-quicknav' session"
   (cond ((eq this-command 'jg-quicknav)
          (jg-quicknav-mode t)
+
+         
          (setq overriding-local-map jg-quicknav-mode-map)
          (add-hook 'post-command-hook 'jgqn-show-results nil t)                            ; t for local-only
          )
