@@ -5,7 +5,7 @@
 ;; Author: Jeff Gran <jeff@jeffgran.com>
 ;; Created: 3 Mar 2013
 ;; Keywords: navigation
-;; Version: 1.3.1
+;; Version: 1.3.2
 ;; Package-Requires: ((s))
 
 ;; This file is not part of GNU Emacs.
@@ -98,6 +98,10 @@
 ;;            - fixed annoying blinking selection line when list is empty
 ;; 2013-04-28 v 1.3.1
 ;;            - fixed bug: dir with space in name results in error. wrap `cd` command in quotes.
+;; 2014-09-12 v 1.3.2
+;;            - fixed bug: use expand-file-name so we always start with a full absolute path
+;;            - fixed bug: concat pwd when visiting file so two files in different directories
+;;              with the same name don't get confused.
 
 
 ;;; Code:
@@ -160,7 +164,10 @@ to go `jgqn-downdir' (forwards) after going `jgqn-updir' (backwards)")
 
 
 (define-minor-mode jg-quicknav-mode
-  "Minor mode that is in effect when navigating using `jq-quicknav'"
+  "Minor mode that is in effect when navigating using `jq-quicknav'
+
+Associated mode map is `jg-quicknav-mode-map':
+\\{jg-quicknav-mode-map}"
   :lighter " jgqn"
   :keymap jg-quicknav-mode-map
   :group 'jg-quicknav)
@@ -190,7 +197,7 @@ to go `jgqn-downdir' (forwards) after going `jgqn-updir' (backwards)")
 Defaults to the value of `default-directory' if not set.
 
 Must not have a trailing /."
-  (or jgqn-pwd (setq jgqn-pwd (s-chop-suffix "/" default-directory))))
+  (or jgqn-pwd (setq jgqn-pwd (s-chop-suffix "/" (expand-file-name default-directory)))))
 
 
 (defun jg-quicknavigating-p ()
@@ -246,7 +253,7 @@ is the standard `minibuffer-local-map') while navigating:
     (read-string (concat "Current Directory: " (jgqn-pwd) "/")))
   
   (if jgqn-file-or-dir-to-visit
-      (switch-to-buffer (get-file-buffer jgqn-file-or-dir-to-visit)))
+      (switch-to-buffer (get-file-buffer (concat (jgqn-pwd) "/" jgqn-file-or-dir-to-visit))))
   
   (jgqn-cleanup)
   (setq jgqn-history nil)
@@ -449,7 +456,8 @@ is a directory."
   (interactive)
   (let ((filename (minibuffer-contents)))
     (find-file (concat (jgqn-pwd) "/" filename))
-    (setq jgqn-file-or-dir-to-visit filename))
+    (setq jgqn-file-or-dir-to-visit filename)
+    )
   (exit-minibuffer))
 
 (defun jgqn-dired ()
