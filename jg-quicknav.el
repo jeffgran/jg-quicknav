@@ -6,7 +6,7 @@
 ;; Created: 3 Mar 2013
 ;; Keywords: navigation
 ;; Version: 1.3.2
-;; Package-Requires: ((s))
+;; Package-Requires: ((s "1.9.0"))
 
 ;; This file is not part of GNU Emacs.
 
