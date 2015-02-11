@@ -6,7 +6,7 @@
 ;; Created: 3 Mar 2013
 ;; Keywords: navigation
 ;; Version: 1.3.2
-;; Package-Requires: ((s "1.9.0"))
+;; Package-Requires: ((s "1.9.0") (cl-lib "0.5"))
 
 ;; This file is not part of GNU Emacs.
 
@@ -15,16 +15,16 @@
 ;; A quick file-finder for emacs. Navigate up and down directories to find a file.
 ;;
 ;; Like ido-find-file, lusty-explorer, helm/anything, etc. But none of them
-;; did quite what I wanted so I created this. The goal is to navigate the file 
+;; did quite what I wanted so I created this. The goal is to navigate the file
 ;; system as fast as possible. Like a much faster way of doing the...
-;; 
+;;
 ;;  1. cd <foo>
 ;;  2. ls
 ;;  3. goto 1
 ;;  4. <open file>
-;;  
+;;
 ;;  ...loop in the shell.
-;;  
+;;
 ;; Usage: - assign `jg-quicknav' to a key, and use it.
 ;;        - buffer will show you the directory listing for the current default directory
 ;;          (reminder: if you're in a file buffer, that will be the directory
@@ -45,7 +45,7 @@
 ;;
 ;; (define-key jg-quicknav-mode-map (kbd "C-n") nil)
 ;; (define-key jg-quicknav-mode-map (kbd "M-n") 'jgqn-next)
-;; 
+;;
 ;;
 ;; TODO/IDEAS:
 ;; - better support for dirs with many files in them
@@ -75,7 +75,7 @@
 ;; 2013-03-09 v 1.1.1
 ;;            - fixed bug: opening multiple files of the same name doesn't work
 ;;            - fixed bug: doesn't show / when / is the jgqn-default-dir
-;;            - fixed bug: use save-window-excursion instead of delete-window when session 
+;;            - fixed bug: use save-window-excursion instead of delete-window when session
 ;;              ends. this ensures your window configuration will look the same before and
 ;;              after the jgqn session
 ;;            - fixed bug: when updating results, clamp the selection index to the number
@@ -107,11 +107,10 @@
 ;;; Code:
 
 (require 's)
-
-(provide 'jg-quicknav)
+(require 'cl-lib)
 
 (defvar jgqn-pwd nil
-  "The current working directory, for jg-quicknav. 
+  "The current working directory, for jg-quicknav.
 This is kept up-to-date while navigating in the quicknav buffer")
 
 (defvar jgqn-ls nil
@@ -125,7 +124,7 @@ Gets created on demand when using `jg-quicknav'")
   "The (1-based) index of the currently selected line in the `jg-quicknav-buffer'")
 
 (defvar jg-quicknav-mode-map (make-sparse-keymap)
-  "The mode that is active in the minibuffer when navigating. 
+  "The mode that is active in the minibuffer when navigating.
 Commands generally control the `jg-quicknav-buffer'
 
 The following keys are defined:
@@ -136,7 +135,7 @@ The following keys are defined:
 
 (defvar jgqn-file-or-dir-to-visit nil
   "A string containing the resulting file name or directory name.
-This is a single 'token', and needs to be combined with (`jgqn-pwd') to be the 
+This is a single 'token', and needs to be combined with (`jgqn-pwd') to be the
 full path.")
 
 (defvar jgqn-history nil
@@ -162,7 +161,7 @@ to go `jgqn-downdir' (forwards) after going `jgqn-updir' (backwards)")
 
 (define-key jg-quicknav-mode-map (kbd "C-d") 'jgqn-shell-cd)
 
-
+;;;###autoload
 (define-minor-mode jg-quicknav-mode
   "Minor mode that is in effect when navigating using `jq-quicknav'
 
@@ -192,7 +191,7 @@ Associated mode map is `jg-quicknav-mode-map':
 
 
 (defun jgqn-pwd ()
-  "The current directory while navigating via `jg-quicknav' 
+  "The current directory while navigating via `jg-quicknav'
 
 Defaults to the value of `default-directory' if not set.
 
@@ -221,6 +220,7 @@ Must not have a trailing /."
             ad-do-it))
         (setq jgqn-initialized t))))
 
+;;;###autoload
 (defun jg-quicknav ()
   "Main entry-point for jg-quicknav. Assign this to your preferred keybinding.
 
@@ -251,13 +251,13 @@ is the standard `minibuffer-local-map') while navigating:
     (setq this-command 'jg-quicknav)
 
     (read-string (concat "Current Directory: " (jgqn-pwd) "/")))
-  
+
   (if jgqn-file-or-dir-to-visit
       (switch-to-buffer (get-file-buffer (concat (jgqn-pwd) "/" jgqn-file-or-dir-to-visit))))
-  
+
   (jgqn-cleanup)
   (setq jgqn-history nil)
-  
+
   (kill-buffer jg-quicknav-buffer))
 
 (defun jg-quicknav-dired ()
@@ -266,8 +266,6 @@ dired buffer."
   (interactive)
   (setq this-command 'jgqn-quicknav-dired)
   (read-string (concat "Current Directory: " (jgqn-pwd) "/")))
-
-
 
 (defun jgqn-cleanup ()
   "Clean out the cached values set while navigating via `jg-quicknav',
@@ -287,7 +285,7 @@ starting a session, changing directories, or after changing the minibuffer text.
 
   (let ((query-string (jgqn-get-minibuffer-string)))
     (with-current-buffer jg-quicknav-buffer
-      
+
       (let ((new-lines (jgqn-sort-and-filter
                         (s-split "\n" (jgqn-ls) t)
                         query-string))
@@ -311,12 +309,12 @@ starting a session, changing directories, or after changing the minibuffer text.
 The filter matches using a regexp with  (.*) between each character.
 Then sort ascending by length if the query is not empty.
 Turns out this is my favorite fuzzy matching/sorting algorithm."
-  (fip-fuzzy-match query 
+  (fip-fuzzy-match query
                    (sort list
-                         '(lambda (s1 s2)
-                            (if (> (length query) 0)
-                                (< (length s1) (length s2))
-                              (string< s1 s2))))))
+                         (lambda (s1 s2)
+			   (if (> (length query) 0)
+			       (< (length s1) (length s2))
+			     (string< s1 s2))))))
 
 (defun jgqn-insert-status-line (query-string)
   (insert (jgqn-pwd))
@@ -356,14 +354,12 @@ is typed."
   (cond ((eq this-command 'jg-quicknav)
          (jg-quicknav-mode t)
 
-         
+
          (setq overriding-local-map jg-quicknav-mode-map)
-         (add-hook 'post-command-hook 'jgqn-show-results nil t)                            ; t for local-only
+         (add-hook 'post-command-hook 'jgqn-show-results nil t)	; t for local-only
          )
         ((eq this-command 'jgqn-quicknav-dired)
          (add-hook 'post-command-hook 'jgqn-filter-dired nil t))))
-
-
 
 (defun jgqn-minibuffer-exit ()
   "Wrapper around `exit-minibuffer' in order to know if we just exited a
@@ -388,7 +384,6 @@ is typed."
   (and (minibufferp)
        (buffer-substring-no-properties (minibuffer-prompt-end) (point-max))))
 
-
 (defun jgqn-visit-file-or-dir ()
   "Get the current selection line and take action
 
@@ -404,7 +399,7 @@ is a directory."
 
   ;; if we got something, find-file it if it's a file,
   ;; or jg-quicknav in it if it's a directory
-  
+
   (when jgqn-file-or-dir-to-visit
     (let ((file-or-dir
            (concat (jgqn-pwd) "/" jgqn-file-or-dir-to-visit)))
@@ -419,10 +414,7 @@ is a directory."
             (jgqn-show-results))
 
         (find-file file-or-dir)
-        (exit-minibuffer)
-        ))
-    )
-  )
+        (exit-minibuffer)))))
 
 (defun jgqn-updir ()
   "Change directories up a level, like using `cd ..`"
@@ -448,8 +440,6 @@ is a directory."
         (delete-minibuffer-contents)
         (jgqn-show-results))
     (ding)))
-
-
 
 (defun jgqn-find-file ()
   "Open the file named by the minibuffer contents. If it doesn't exist, create it"
@@ -491,8 +481,6 @@ is a directory."
     ;; no process -- this is not a shell buffer.
     (ding)))
 
-
-
 ;;===============================
 ;; setting/changing the selection:
 ;;===============================
@@ -523,7 +511,6 @@ is a directory."
   (interactive)
   (jgqn-change-selection-index +1))
 
-
 (defun jgqn-last ()
   "Go to the last selection in the `jg-quicknav-buffer'"
   (interactive)
@@ -534,42 +521,41 @@ is a directory."
   (interactive)
   (jgqn-set-selection-index 1))
 
-
-
 (defun jgqn-get-current-line ()
   "Return the current line with no properties and no \n or ^J or whatever else at the end,
 and without a trailing / if it was there"
-  (goto-line (+ 2 jgqn-selection-index)) ;; + 2 to account for the status line and blank line
+  (goto-char (point-min))
+  (forward-line (1- (+ 2 jgqn-selection-index))) ;; + 2 to account for the status line and blank line
   (let ((line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
     ;; remove the trailing executable or directory indicator
-    (s-chop-suffixes '("@" "*" "/") line))
-  )
-
+    (s-chop-suffixes '("@" "*" "/") line)))
 
 (defun jgqn-count-lines ()
   (with-current-buffer jg-quicknav-buffer
     (count-lines (point-min) (point-max))))
-
 
 ;; ===============================================================================
 ;; Faces
 ;; ===============================================================================
 (defface jg-quicknav-directory-face
   '((t (:foreground "#FFEA77")))
-  "This face is used to color directories in the quicknav buffer")
+  "This face is used to color directories in the quicknav buffer"
+  :group 'jg-quicknav)
 
 (defface jg-quicknav-selected-directory-face
   '((t (:foreground "#FFEA77" :background "#004083")))
-  "This face is used to color a directory in the quicknav buffer if it is on the selection line")
+  "This face is used to color a directory in the quicknav buffer if it is on the selection line"
+  :group 'jg-quicknav)
 
 (defface jg-quicknav-file-face
   '((t (:foreground "#6cb0f3")))
-  "This face is used to color files in the quicknav buffer")
+  "This face is used to color files in the quicknav buffer"
+  :group 'jg-quicknav)
 
 (defface jg-quicknav-selected-file-face
   '((t (:foreground "#ccffef" :background "#004083")))
-  "This face is used to color a file in the quicknav buffer if it is on the selection line")
-
+  "This face is used to color a file in the quicknav buffer if it is on the selection line"
+  :group 'jg-quicknav)
 
 (defun jgqn-update-faces ()
   "Updates the faces for the quicknav buffer"
@@ -578,7 +564,9 @@ and without a trailing / if it was there"
       (remove-list-of-text-properties (point-min) (point-max) '(face))
 
       ;; colors for files and dirs
-      (goto-line 3)
+      (goto-char (point-min))
+      (forward-line (1- 3))
+
       (while (progn
                (cond (
                       ;; highlighted directories
@@ -589,7 +577,7 @@ and without a trailing / if it was there"
                        (line-beginning-position)
                        (+ 1 (line-end-position))
                        '(face jg-quicknav-selected-directory-face)))
-                     
+
                      ;; directories
                      ((eq ?/ (char-before (line-end-position)))
                       (add-text-properties
@@ -613,12 +601,12 @@ and without a trailing / if it was there"
                          (line-end-position)
                          '(face jg-quicknav-file-face)))
                      )
-               
+
                (not (and
                      (> (forward-line 1) 0)
                      (eq (point-max) (point))))
                ))
-      
+
       )
     )
   )
@@ -649,17 +637,20 @@ and without a trailing / if it was there"
 
 (defun fip-match-with-regexp (regexp lst)
   "Return the elements of list lst which match the regular expression regexp"
-  (remove-if-not
+  (cl-remove-if-not
    (lambda (str)
      (eql-match-p str regexp))
    lst))
+
 (defun explode-to-regexp (string)
   "Explode a string to a regular expression, where each char has a .* in front and back of it"
   (apply 'concat (explode-to-regexp-list string)))
+
 (defun explode-to-regexp-list (string)
   "Explode a string to a list of chars, where each char has a .* in front and back of it"
   (cons ".*"
         (mapcar 'char-exploded-to-regexp string)))
+
 (defun char-exploded-to-regexp (char)
   (concat (string char) ".*"))
 
@@ -673,5 +664,7 @@ and without a trailing / if it was there"
 ;; ---------------------------------------------------------------------------------------
 ;; /Library
 ;; ---------------------------------------------------------------------------------------
+
+(provide 'jg-quicknav)
 
 ;;; jg-quicknav.el ends here
