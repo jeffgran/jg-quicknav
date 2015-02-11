@@ -1,6 +1,6 @@
 ;;; jg-quicknav.el --- Quickly navigate the file system to find a file.
 
-;; Copyright (C) 2013 Jeff Gran
+;; Copyright (C) 2013-2015 Jeff Gran
 
 ;; Author: Jeff Gran <jeff@jeffgran.com>
 ;; Created: 3 Mar 2013
