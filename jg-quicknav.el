@@ -3,6 +3,7 @@
 ;; Copyright (C) 2013-2015 Jeff Gran
 
 ;; Author: Jeff Gran <jeff@jeffgran.com>
+;; URL: https://github.com/jeffgran/jg-quicknav
 ;; Created: 3 Mar 2013
 ;; Keywords: navigation
 ;; Version: 1.4.0
