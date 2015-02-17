@@ -108,12 +108,15 @@
 ;;              - everything now prefixed with jg-quicknav- (previously some were jgqn-)
 ;;              - prefixed stolen functions too, to prevent conflicts.
 ;;              - internal-only functions prefixed with jg-quicknav--
+;; 2015-02-16 v 1.4.1
+;;            - add (require 'tramp) to make sure tramp is loaded. doesn't work without it.
 
 
 ;;; Code:
 
 (require 's)
 (require 'cl-lib)
+(require 'tramp)
 
 (defvar jg-quicknav-pwd nil
   "The current working directory, for jg-quicknav.
