@@ -185,8 +185,8 @@ Associated mode map is `jg-quicknav-mode-map':
   (or jg-quicknav-ls
       (setq jg-quicknav-ls
             (let ((the-pwd (if (tramp-tramp-file-p (jg-quicknav-pwd))
-                               (with-parsed-tramp-file-name (jg-quicknav-pwd) pwd
-                                 pwd-localname)
+                               (with-parsed-tramp-file-name (jg-quicknav-pwd) jg-quicknav-pwd
+                                 jg-quicknav-pwd-localname)
                              (jg-quicknav-pwd))))
               (let ((prev-shell-file-name shell-file-name))
                 (prog2
