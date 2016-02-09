@@ -344,7 +344,7 @@ Turns out this is my favorite fuzzy matching/sorting algorithm."
 is typed."
   (interactive)
   (let ((query (jg-quicknav--explode-to-regexp (jg-quicknav-get-minibuffer-string))))
-    (with-current-buffer (cdr (first dired-buffers))
+    (with-current-buffer (cdr (cl-first dired-buffers))
       (suppress-messages
        (revert-buffer)
        (dired-mark-files-regexp query)
