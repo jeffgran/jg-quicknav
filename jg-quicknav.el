@@ -1,6 +1,6 @@
 ;;; jg-quicknav.el --- Quickly navigate the file system to find a file.
 
-;; Copyright (C) 2013-2015 Jeff Gran
+;; Copyright (C) 2013-2017 Jeff Gran
 
 ;; Author: Jeff Gran <jeff@jeffgran.com>
 ;; URL: https://github.com/jeffgran/jg-quicknav
@@ -10,6 +10,20 @@
 ;; Package-Requires: ((s "1.9.0") (cl-lib "0.5"))
 
 ;; This file is not part of GNU Emacs.
+
+;; This code is licensed under the Do What the Fuck You Want To Public License
+;;
+;;        DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE
+;;                    Version 2, December 2004
+;;
+;; Everyone is permitted to copy and distribute verbatim or modified
+;; copies of this license document, and changing it is allowed as long
+;; as the name is changed.
+;;
+;;            DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE
+;;   TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION
+;;
+;;  0. You just DO WHAT THE FUCK YOU WANT TO.
 
 ;;; Commentary:
 
@@ -248,7 +262,8 @@ is the standard `minibuffer-local-map') while navigating:
   (setq jg-quicknav-buffer (get-buffer-create "*quicknav*"))
 
   (with-current-buffer jg-quicknav-buffer
-    (setq buffer-read-only t))
+    (setq buffer-read-only t)
+    (setq cursor-type nil))
 
   (save-window-excursion
     (display-buffer jg-quicknav-buffer)
@@ -268,6 +283,7 @@ is the standard `minibuffer-local-map') while navigating:
   (setq jg-quicknav-history nil)
 
   (kill-buffer jg-quicknav-buffer))
+
 
 (defun jg-quicknav-cleanup ()
   "Clean out the cached values set while navigating via `jg-quicknav',
